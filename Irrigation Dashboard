@@ -1,5 +1,5 @@
 /**
- *  Rachio Dashboard SVG Rendering for Hubitat
+ *  Irrigation Dashboard for Hubitat
  *  Author: Justin Leonard, Josh Lyon (support@sharptools.io)
  *	Version: See getVersionMap()
  */
@@ -11,10 +11,10 @@
 import groovy.json.JsonBuilder
 import groovy.json.JsonSlurper
 definition(
-        name: "Rachio Dashboard",
+        name: "Irrigation Dashboard",
         namespace: "lnjustin",
         author: "Justin Leonard, Josh Lyon",
-        description: "Rachio Dashboard SVG Rendering for Hubitat",
+        description: "Irrigation Dashboard Rendering for Hubitat",
         category: "Irrigation",
         iconUrl: "",
         iconX2Url: "",
@@ -62,7 +62,8 @@ def settings(){
                 input "highTempTextColorCustom", "string", title: "High Temp Text Color (format: #FFFFFF)", submitOnChange: true
                 input "lowTempTextColorCustom", "string", title: "Low Temp Text Color (format: #FFFFFF)", submitOnChange: true
             }
-            input "globalScale", "number", title: "Global Scale", submitOnChange: true
+            input "globalScale", "number", title: "Global Scale (in percent)",defaultValue: 100, submitOnChange: true
+            input "extraVerticalSpace", "number", title: "Extra Vertical Spacing (in pts)", defaultValue: 0, submitOnChange: true
 
         }
         
@@ -92,7 +93,9 @@ def getSvg(){
     Integer svgWidth = columnWidth * numDays
     svg = '<svg version="1.1" id="weather" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 ' + Integer.toString(svgWidth) + ' 95" style="enable-background:new 0 0 ' + Integer.toString(svgWidth) + ' 95;" xml:space="preserve">'
     
-    svg += '<style type="text/css"> .cloud{fill:' + colorScheme.cloudColor + ';} .light{fill:' + colorScheme.lightColor + ';} .precip{fill:' + colorScheme.precipColor + ';} .frozenPrecip{fill:' + colorScheme.frozenPrecipColor + ';} .sprinklerHead{fill:' + colorScheme.sprinklerHeadColor + ';} .sprinklerWater{fill:' + colorScheme.sprinklerWaterColor + ';} .sprinklerBackgroundWatering{fill:' + colorScheme.sprinklerBackgroundWateringColor + ';} .sprinklerBackgroundSkip{fill:' + colorScheme.sprinklerBackgroundSkipColor + ';} .dayText{fill:' + colorScheme.dayTextColor + ';} .precipText{fill:' + colorScheme.precipTextColor + '; word-spacing:110%;} .tempText{fill:url(#bicolored); word-spacing:110%;} .largeFontClass {font-family:"ArialMT";font-size:12px;} .smallFontClass {font-family:"ArialMT";font-size:7px;} </style> <defs> <linearGradient id="bicolored"> <stop offset="50%" stop-color="' + colorScheme.highTempTextColor + '"/> <stop offset="50%" stop-color="' + colorScheme.lowTempTextColor + '"/> </linearGradient> </defs><g transform="scale(' + Long.toString(globalScale) + ')">'
+    svg += '<style type="text/css"> .cloud{fill:' + colorScheme.cloudColor + ';} .light{fill:' + colorScheme.lightColor + ';} .precip{fill:' + colorScheme.precipColor + ';} .frozenPrecip{fill:' + colorScheme.frozenPrecipColor + ';} .sprinklerHead{fill:' + colorScheme.sprinklerHeadColor + ';} .sprinklerWater{fill:' + colorScheme.sprinklerWaterColor + ';} .sprinklerBackgroundWatering{fill:' + colorScheme.sprinklerBackgroundWateringColor + ';} .sprinklerBackgroundSkip{fill:' + colorScheme.sprinklerBackgroundSkipColor + ';} .dayText{fill:' + colorScheme.dayTextColor + ';} .precipText{fill:' + colorScheme.precipTextColor + '; word-spacing:110%;} .tempText{fill:url(#bicolored); word-spacing:110%;} .largeFontClass {font-family:"ArialMT";font-size:12px;} .smallFontClass {font-family:"ArialMT";font-size:7px;} </style> <defs> <linearGradient id="bicolored"> <stop offset="50%" stop-color="' + colorScheme.highTempTextColor + '"/> <stop offset="50%" stop-color="' + colorScheme.lowTempTextColor + '"/> </linearGradient> </defs>'
+    
+    svg += '<g transform="scale(' + Double.toString(globalScale/100) + ')">'
 
     for (Integer i = 0; i < numDays; i++) {
         
@@ -133,19 +136,22 @@ def getSvg(){
         svg += '<text x="' + Integer.toString(halfColumnWidth) + '" y="1.5" text-anchor="middle" class="dayText largeFontClass">' + dayLabel + '</text>'
         
         svg += weatherIcon
-        
+              
         if (showPrecipPercent || showPrecipAmount) {
-            svg += '<text x="' + Integer.toString(halfColumnWidth) + '" y="67" text-anchor="middle" class="precipText smallFontClass">' + (showPrecipPercent ? precipPercent : '') + ' ' + (showPrecipAmount ? precipAmount : '') + '</text>'
+            svg += '<text x="' + Integer.toString(halfColumnWidth) + '" y="' + Long.toString((67+extraVerticalSpace)) + '" text-anchor="middle" class="precipText smallFontClass">' + (showPrecipPercent ? precipPercent : '') + ' ' + (showPrecipAmount ? precipAmount : '') + '</text>'
         }
         
         if (showTemp) {
-            svg += '<text x="' + Integer.toString(halfColumnWidth) + '" y="79" text-anchor="middle" class="tempText largeFontClass">' + highTemp + ' | ' + lowTemp + '</text>'
+            tempExtraVerticalSpacing = (showPrecipPercent || showPrecipAmount) ? extraVerticalSpace*2 : extraVerticalSpace
+            svg += '<text x="' + Integer.toString(halfColumnWidth) + '" y="' + Long.toString((79+tempExtraVerticalSpacing)) + '" text-anchor="middle" class="tempText largeFontClass">' + highTemp + ' | ' + lowTemp + '</text>'
         }
-
-
-        sprinklerTranslateY = "-17"
-        if (showTemp) { sprinklerTranslateY = "5" }
-        else if (showPrecipPercent || showPrecipAmount) { sprinklerTranslateY = "-10" }
+        
+        sprinklerExtraVerticalSpacing = extraVerticalSpace
+        if ((showPrecipPercent || showPrecipAmount) && showTemp) { sprinklerExtraVerticalSpacing = extraVerticalSpace*3 }
+        else if ((showPrecipPercent || showPrecipAmount) || showTemp) { sprinklerExtraVerticalSpacing = extraVerticalSpace*2 }
+        sprinklerTranslateY = Long.toString((-17+sprinklerExtraVerticalSpacing))
+        if (showTemp) { sprinklerTranslateY = Long.toString((5+sprinklerExtraVerticalSpacing)) }
+        else if (showPrecipPercent || showPrecipAmount) { sprinklerTranslateY = Long.toString((-10+sprinklerExtraVerticalSpacing)) }
         svg += '<g transform="translate(0,' + sprinklerTranslateY + ')">'
         if (irrigationIcon == sprinklerWatering) { svg += sprinklerWatering }
         else if (irrigationIcon == sprinklerSkip) { svg += sprinklerSkip }
